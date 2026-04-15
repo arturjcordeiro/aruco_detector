@@ -1,0 +1,12 @@
+#goal definition
+int32 number
+---
+#result definition
+int32 percentage
+string skill_status
+string outcome
+
+---
+#feedback
+int32 percentage
+string skill_status

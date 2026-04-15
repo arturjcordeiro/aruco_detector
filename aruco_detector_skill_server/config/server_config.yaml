@@ -1,0 +1,10 @@
+# Configuration file for Diet Estimation Skill Server
+aruco_detector_skill_server:
+  ros__parameters:
+    # Verbosity level for ROS logging
+    # Options: DEBUG, INFO, WARN, ERROR, FATAL
+    ros_verbosity_level: "DEBUG"
+    # Custom log folder path (optional)
+    # If empty, defaults to ~/.ros2/node_name/timestamp
+    log_folder_path: ""
+
