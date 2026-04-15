@@ -54,11 +54,19 @@ public:
   void Start();
 
 private:
+  enum OperationMode {
+    Detect = 0,
+    Load = 1,
+  };
+
   rclcpp::Node::SharedPtr node_;
   std::string package_path_, ros_verbosity_level_, logs_path_,
-      node_timestamp_id_;
+      node_timestamp_id_, action_outcome_;
 
   rclcpp_action::Server<ArucoDetectorSkill>::SharedPtr action_server_;
+
+  bool LoadDetector();
+  bool DetectAruco();
 
   /**
    * @brief Setup logs directory, creating it if necessary

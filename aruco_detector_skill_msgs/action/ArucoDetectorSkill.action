@@ -1,5 +1,5 @@
 #goal definition
-int32 number
+int32 operation
 ---
 #result definition
 int32 percentage

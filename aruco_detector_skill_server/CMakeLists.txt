@@ -18,6 +18,9 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+
+set(OpenCV_DIR "/usr/local/opencv_4_12/lib/cmake/opencv4")
+
 #############################################################
 # DEPENDENCIES
 #############################################################
@@ -33,6 +36,11 @@ find_package(rclcpp_action REQUIRED)
 find_package(aruco_detector_skill_msgs REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 
+find_package(OpenCV 4)
+find_package(cv_bridge REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
 
 
 # Store dependencies in a variable for later use
@@ -43,6 +51,11 @@ set(DEPENDENCIES
   
   aruco_detector_skill_msgs
   ament_index_cpp
+
+  OpenCV
+  cv_bridge
+  image_transport
+  sensor_msgs
 )
 
 #############################################################
@@ -86,9 +99,7 @@ set(DEPENDENCIES
 # The name is defined by the PROJECT_NAME variable (aruco_detector_skill_server)
 add_library(${PROJECT_NAME}
         src/aruco_detector_skill_server.cpp
-        # Commented files to be added later
-        # src/heuristics/protein_selector.cpp
-        # src/heuristics/fiber_selector.cpp
+        src/aruco_utils.cpp
 )
 
 # Define include directories for the library

@@ -191,5 +191,29 @@ void ArucoDetectorSkillServer::execute(
   */
 
   RCLCPP_INFO(node_->get_logger(), "Executing skill.");
-  set_succeeded(_goal_handle);
+  const auto goal = _goal_handle->get_goal();
+
+  action_outcome_ = "succeeded";
+
+  bool action_success = false;
+
+  switch (goal->operation) {
+  case OperationMode::Detect:
+    if (DetectAruco()) {
+      action_success = true;
+    }
+    break;
+  case OperationMode::Load:
+    if (LoadDetector()) {
+      action_success = true;
+    }
+    break;
+  }
+
+  (action_success) ? set_succeeded(_goal_handle, "succeeded", action_outcome_)
+                   : set_aborted(_goal_handle, "aborted", "aborted");
 }
+
+bool ArucoDetectorSkillServer::LoadDetector() { return true; }
+
+bool ArucoDetectorSkillServer::DetectAruco() { return true; }
