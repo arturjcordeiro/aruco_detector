@@ -8,6 +8,7 @@
  */
 
 #include "aruco_detector_skill_server/aruco_detector_skill_server.hpp"
+#include <opencv2/objdetect/aruco_dictionary.hpp>
 
 ArucoDetectorSkillServer::ArucoDetectorSkillServer(
     const rclcpp::Node::SharedPtr &_node) {
@@ -214,6 +215,43 @@ void ArucoDetectorSkillServer::execute(
                    : set_aborted(_goal_handle, "aborted", "aborted");
 }
 
+cv::aruco::PredefinedDictionaryType
+ArucoDetectorSkillServer::dictionaryFromString(const std::string &name) {
+  static const std::unordered_map<std::string,
+                                  cv::aruco::PredefinedDictionaryType>
+      dict = {
+          {"DICT_4X4_50", cv::aruco::DICT_4X4_50},
+          {"DICT_4X4_100", cv::aruco::DICT_4X4_100},
+          {"DICT_4X4_250", cv::aruco::DICT_4X4_250},
+          {"DICT_4X4_1000", cv::aruco::DICT_4X4_1000},
+          {"DICT_5X5_50", cv::aruco::DICT_5X5_50},
+          {"DICT_5X5_100", cv::aruco::DICT_5X5_100},
+          {"DICT_5X5_250", cv::aruco::DICT_5X5_250},
+          {"DICT_5X5_1000", cv::aruco::DICT_5X5_1000},
+          {"DICT_6X6_50", cv::aruco::DICT_6X6_50},
+          {"DICT_6X6_100", cv::aruco::DICT_6X6_100},
+          {"DICT_6X6_250", cv::aruco::DICT_6X6_250},
+          {"DICT_6X6_1000", cv::aruco::DICT_6X6_1000},
+          {"DICT_ARUCO_ORIGINAL", cv::aruco::DICT_ARUCO_ORIGINAL},
+      };
+
+  auto it = dict.find(name);
+  if (it == dict.end()) {
+    throw std::invalid_argument("Unknown ArUco dictionary: '" + name + "'");
+  }
+  return it->second;
+}
+
 bool ArucoDetectorSkillServer::LoadDetector() { return true; }
 
-bool ArucoDetectorSkillServer::DetectAruco() { return true; }
+bool ArucoDetectorSkillServer::DetectAruco() {
+  // Only for tests
+  cv::aruco::DetectorParameters detectorParams =
+      cv::aruco::DetectorParameters();
+  detectorParams.adaptiveThreshConstant = 1.0;
+
+  auto dic_type = dictionaryFromString("DICT_4X4_50");
+
+  aruco_detector_skill::utils::ArucoUtils detector(dic_type, detectorParams);
+  return true;
+}

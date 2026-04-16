@@ -19,6 +19,7 @@
 
 #include "ament_index_cpp/get_package_share_directory.hpp"
 #include "aruco_detector_skill_msgs/action/aruco_detector_skill.hpp"
+#include "aruco_detector_skill_server/aruco_utils.hpp"
 #include "common/verbosity_levels.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -67,6 +68,8 @@ private:
 
   bool LoadDetector();
   bool DetectAruco();
+  static cv::aruco::PredefinedDictionaryType
+  dictionaryFromString(const std::string &name);
 
   /**
    * @brief Setup logs directory, creating it if necessary
