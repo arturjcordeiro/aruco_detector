@@ -17,12 +17,6 @@ protected:
   cv::aruco::DetectorParameters params_;
 
   cv::aruco::ArucoDetector detector_;
-  void Detect(const cv::Mat &image_grayscale, const cv::Mat &camera_intrinsics,
-              const cv::Mat &camera_distortion_coefficients,
-              const float markerLength, std::vector<cv::Vec3d> &tvecs,
-              std::vector<cv::Vec3d> &rvecs, bool use_extrinsic_guess,
-              int pnp_flags, cv::InputOutputArray image_w_results,
-              bool show_rejected);
 
 public:
   explicit ArucoUtils(
@@ -32,6 +26,13 @@ public:
       : dict_(cv::aruco::getPredefinedDictionary(dict_type)), params_(params),
         detector_(dict_, params_) {}
   ~ArucoUtils() = default;
+
+  void Detect(const cv::Mat &image_grayscale, const cv::Mat &camera_intrinsics,
+              const cv::Mat &camera_distortion_coefficients,
+              const float markerLength, std::vector<cv::Vec3d> &tvecs,
+              std::vector<cv::Vec3d> &rvecs, bool use_extrinsic_guess,
+              int pnp_flags, cv::InputOutputArray image_w_results,
+              bool show_rejected, size_t n_markers);
 };
 } // namespace aruco_detector_skill::utils
 #endif // ARUCO_DETECTOR_SKILL_SERVER_ARUCO_UTILS_H

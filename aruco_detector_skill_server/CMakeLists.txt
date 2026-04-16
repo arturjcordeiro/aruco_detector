@@ -41,6 +41,10 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_eigen REQUIRED)
 
 
 # Store dependencies in a variable for later use
@@ -56,6 +60,11 @@ set(DEPENDENCIES
   cv_bridge
   image_transport
   sensor_msgs
+
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  tf2_eigen
 )
 
 #############################################################

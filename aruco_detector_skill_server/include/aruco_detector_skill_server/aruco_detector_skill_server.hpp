@@ -27,6 +27,14 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 #include <sensor_msgs/image_encodings.hpp>
 
+#include <tf2_eigen/tf2_eigen.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/static_transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2_ros/transform_listener.h>
+
+#include <opencv2/core/eigen.hpp>
+
 using namespace std;
 using namespace std::chrono_literals;
 
@@ -69,17 +77,51 @@ private:
 
   cv::Mat camera_intrinsics_matrix_, camera_distortion_coefficients_matrix_;
 
+  cv::aruco::DetectorParameters detector_parameters_{
+      cv::aruco::DetectorParameters()};
+
   rclcpp::Node::SharedPtr node_;
   std::string package_path_, ros_verbosity_level_, logs_path_,
-      node_timestamp_id_, action_outcome_;
+      node_timestamp_id_, action_outcome_, image_sub_topic_, camera_info_topic_,
+      image_results_publish_topic_, dict_id_string_;
   std::unordered_map<std::string, std::string> opencv_encodings_;
+
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_ptr_;
+  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> static_tf_broadcaster_;
+  std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
+  bool use_clahe_, use_adaptivethreshold_, show_rejected_,
+      use_static_tf_broadcaster_, debug_tool_;
+  float clahe_clip_limit_, adaptive_thresh_offset_from_mean_,
+      adaptive_thresh_max_, marker_length_;
+  int clahe_sizex_, clahe_sizey_, adaptive_thresh_method_,
+      adaptive_thresh_type_, adaptive_thresh_blocksize_, pnp_method_;
+
+  std_msgs::msg::Header latest_header_;
+  geometry_msgs::msg::TransformStamped transform_stamped_;
+
+  std::shared_ptr<image_transport::ImageTransport> image_transport_ptr_;
+  std::shared_ptr<image_transport::ImageTransport> image_transport_results_ptr_;
+  image_transport::Subscriber image_subscriber_;
+  image_transport::Publisher image_results_publisher_;
+  rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
+      camera_info_subscriber_;
 
   rclcpp_action::Server<ArucoDetectorSkill>::SharedPtr action_server_;
 
   bool LoadDetector();
   bool DetectAruco();
   static cv::aruco::PredefinedDictionaryType
-  dictionaryFromString(const std::string &name);
+  DictionaryFromString(const std::string &name);
+  void ApplyClahe(cv::Mat &img_in);
+  void ApplyAdaptiveThreshold(cv::Mat &img_in);
+  void PublishRosImage(const cv::Mat &img, image_transport::Publisher &pub);
+  void PublishPoses(std::vector<cv::Vec3d> &tvecs,
+                    std::vector<cv::Vec3d> &rvecs, size_t n_markers);
+  void FillPose(const cv::Vec3d &_camera_rotation,
+                const cv::Vec3d &_camera_translation,
+                geometry_msgs::msg::PoseStamped &_pose_in_out);
 
   void ImageCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
   void

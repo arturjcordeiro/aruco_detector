@@ -1,10 +1,85 @@
-# Configuration file for Diet Estimation Skill Server
+# Configuration file
 aruco_detector_skill_server:
   ros__parameters:
-    # Verbosity level for ROS logging
-    # Options: DEBUG, INFO, WARN, ERROR, FATAL
-    ros_verbosity_level: "DEBUG"
-    # Custom log folder path (optional)
-    # If empty, defaults to ~/.ros2/node_name/timestamp
-    log_folder_path: ""
+    RosVerbosityLevel: "DEBUG"
+    LogFolderPath: ""
+    DebugTools: true
+
+    # ── Camera Topics ──────────────────────────────────────────────────────────
+    Camera:
+      imageSubTopic: "image_raw"
+      cameraInfoTopic: "camera_info"
+
+    # ── Result Publisher ───────────────────────────────────────────────────────
+    Result:
+      topic: "result"
+      showRejected: false
+
+    # ── PnP / TF ───────────────────────────────────────────────────────────────
+    PnPMethod: 0
+    UseStaticTfBroadcaster: false
+
+    # ── CLAHE ──────────────────────────────────────────────────────────────────
+    Clahe:
+      use: true
+      clipLimit: 4.0
+      sizeX: 2
+      sizeY: 2
+
+    # ── Adaptive Threshold ─────────────────────────────────────────────────────
+    AdaptiveThreshold:
+      use: false
+      maxValue: 255.0
+      method: 4          # cv::ADAPTIVE_THRESH_GAUSSIAN_C
+      type: 0            # cv::THRESH_BINARY
+      blockSize: 45
+      constantOffsetFromMean: 0.0
+
+    # ── Dictionary ─────────────────────────────────────────────────────────────
+    Dictionary: "DICT_4X4_50"
+
+    # ── ArUco Detector Parameters ──────────────────────────────────────────────
+    Aruco:
+      # Adaptive thresholding
+      adaptiveThreshWinSizeMin: 3
+      adaptiveThreshWinSizeMax: 23
+      adaptiveThreshWinSizeStep: 10
+      adaptiveThreshConstant: 7.0
+
+      # Contour filtering
+      minMarkerPerimeterRate: 0.03
+      maxMarkerPerimeterRate: 4.0
+      polygonalApproxAccuracyRate: 0.03
+      minCornerDistanceRate: 0.05
+      minDistanceToBorder: 3
+      minMarkerDistanceRate: 0.05
+
+      # Corner refinement (0=NONE, 1=SUBPIX, 2=CONTOUR, 3=APRILTAG)
+      cornerRefinementMethod: 0
+      cornerRefinementWinSize: 5
+      cornerRefinementMaxIterations: 30
+      cornerRefinementMinAccuracy: 0.1
+      relativeCornerRefinmentWinSize: 0.3  # note: OpenCV typo preserved
+
+      # Marker decoding
+      markerBorderBits: 1
+      perspectiveRemovePixelPerCell: 4
+      perspectiveRemoveIgnoredMarginPerCell: 0.13
+      maxErroneousBitsInBorderRate: 0.35
+      minOtsuStdDev: 5.0
+      errorCorrectionRate: 0.6
+
+      # AprilTag (only used when cornerRefinementMethod: 3)
+      aprilTagQuadDecimate: 0.0
+      aprilTagQuadSigma: 0.0
+      aprilTagMinClusterPixels: 5
+      aprilTagMaxNmaxima: 10
+      aprilTagCriticalRad: 0.1745  # 10 * PI / 180
+      aprilTagMaxLineFitMse: 10.0
+      aprilTagMinWhiteBlackDiff: 5
+      aprilTagDeglitch: 0
+
+      # Misc
+      detectInvertedMarker: false
+      useAruco3Detection: false
 
