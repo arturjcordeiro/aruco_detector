@@ -189,7 +189,7 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
   // ── Publiser
   // ─────────────────────────────────────────────────────
   node_->get_parameter_or("Result.topic", image_results_publish_topic_,
-                          std::string(""));
+                          std::string("result"));
   node_->get_parameter_or("Result.showRejected", show_rejected_, false);
 
   // ── PnP method
@@ -330,6 +330,8 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
                        {"32SC1", sensor_msgs::image_encodings::TYPE_32SC1},
                        {"32SC3", sensor_msgs::image_encodings::TYPE_32SC3}};
 
+  RCLCPP_INFO(node_->get_logger(), "Finishing setting up.");
+
   image_transport_ptr_ =
       std::make_shared<image_transport::ImageTransport>(node_);
   image_subscriber_ = image_transport_ptr_->subscribe(
@@ -447,11 +449,6 @@ void ArucoDetectorSkillServer::execute(
       action_success = true;
     }
     break;
-  case OperationMode::Load:
-    if (LoadDetector()) {
-      action_success = true;
-    }
-    break;
   }
 
   (action_success) ? set_succeeded(_goal_handle, "succeeded", action_outcome_)
@@ -484,8 +481,6 @@ ArucoDetectorSkillServer::DictionaryFromString(const std::string &name) {
   }
   return it->second;
 }
-
-bool ArucoDetectorSkillServer::LoadDetector() { return true; }
 
 bool ArucoDetectorSkillServer::DetectAruco() {
   // Only for tests

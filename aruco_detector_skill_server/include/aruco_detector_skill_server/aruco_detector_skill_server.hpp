@@ -68,7 +68,6 @@ public:
 private:
   enum OperationMode {
     Detect = 0,
-    Load = 1,
   };
 
   std::mutex image_mutex_, camera_info_mutex_;
@@ -110,7 +109,6 @@ private:
 
   rclcpp_action::Server<ArucoDetectorSkill>::SharedPtr action_server_;
 
-  bool LoadDetector();
   bool DetectAruco();
   static cv::aruco::PredefinedDictionaryType
   DictionaryFromString(const std::string &name);

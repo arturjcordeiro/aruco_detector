@@ -18,7 +18,8 @@ int main(int argc, char **argv) {
   node_options.allow_undeclared_parameters(true);
   node_options.automatically_declare_parameters_from_overrides(true);
 
-  auto node = std::make_shared<rclcpp::Node>("aruco_detector_skill_server");
+  auto node = std::make_shared<rclcpp::Node>("aruco_detector_skill_server",
+                                             node_options);
   const auto skill_server = std::make_unique<ArucoDetectorSkillServer>(node);
   skill_server->Start();
 
