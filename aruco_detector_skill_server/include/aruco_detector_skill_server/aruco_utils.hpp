@@ -17,10 +17,12 @@ protected:
   cv::aruco::DetectorParameters params_;
 
   cv::aruco::ArucoDetector detector_;
-  void detect(const cv::Mat &image,
-              std::vector<std::vector<cv::Point2f>> &corners,
-              std::vector<std::vector<cv::Point2f>> &rejected_corners,
-              std::vector<int> &ids);
+  void Detect(const cv::Mat &image_grayscale, const cv::Mat &camera_intrinsics,
+              const cv::Mat &camera_distortion_coefficients,
+              const float markerLength, std::vector<cv::Vec3d> &tvecs,
+              std::vector<cv::Vec3d> &rvecs, bool use_extrinsic_guess,
+              int pnp_flags, cv::InputOutputArray image_w_results,
+              bool show_rejected);
 
 public:
   explicit ArucoUtils(

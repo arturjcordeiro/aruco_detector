@@ -21,8 +21,11 @@
 #include "aruco_detector_skill_msgs/action/aruco_detector_skill.hpp"
 #include "aruco_detector_skill_server/aruco_utils.hpp"
 #include "common/verbosity_levels.hpp"
+#include "cv_bridge/cv_bridge.hpp"
+#include "image_transport/image_transport.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include <sensor_msgs/image_encodings.hpp>
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -60,9 +63,16 @@ private:
     Load = 1,
   };
 
+  std::mutex image_mutex_, camera_info_mutex_;
+  cv::Mat latest_image_;
+  std::atomic<bool> has_image_{false}, has_camera_info_{false};
+
+  cv::Mat camera_intrinsics_matrix_, camera_distortion_coefficients_matrix_;
+
   rclcpp::Node::SharedPtr node_;
   std::string package_path_, ros_verbosity_level_, logs_path_,
       node_timestamp_id_, action_outcome_;
+  std::unordered_map<std::string, std::string> opencv_encodings_;
 
   rclcpp_action::Server<ArucoDetectorSkill>::SharedPtr action_server_;
 
@@ -71,15 +81,19 @@ private:
   static cv::aruco::PredefinedDictionaryType
   dictionaryFromString(const std::string &name);
 
+  void ImageCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
+  void
+  cameraInfoCallback(const sensor_msgs::msg::CameraInfo::ConstSharedPtr &msg);
+
   /**
    * @brief Setup logs directory, creating it if necessary
    *
-   * This method ensures that the logs directory exists by either identifying
-   * an existing directory or creating a new one. If logs_path_ is empty,
-   * it defaults to package_path_ + "/logs".
+   * This method ensures that the logs directory exists by either
+   * identifying an existing directory or creating a new one. If logs_path_
+   * is empty, it defaults to package_path_ + "/logs".
    *
-   * @throws std::runtime_error If directory creation fails due to filesystem
-   * errors
+   * @throws std::runtime_error If directory creation fails due to
+   * filesystem errors
    * @throws std::runtime_error If any unexpected error occurs during setup
    */
   void setupLogsDirectory();

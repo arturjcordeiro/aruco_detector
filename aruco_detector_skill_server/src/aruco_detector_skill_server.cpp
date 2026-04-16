@@ -114,7 +114,7 @@ void ArucoDetectorSkillServer::is_cancelled(
     result->outcome = "CANCELED";
 
     _goal_handle->canceled(result);
-    RCLCPP_INFO(node_->get_logger(), result->skill_status.c_str());
+    RCLCPP_INFO(node_->get_logger(), "%s", result->skill_status.c_str());
   }
 }
 
@@ -177,6 +177,83 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
       node_.get(), ros_verbosity_level_);
 
   setupLogsDirectory();
+
+  opencv_encodings_ = {{"bgr8", sensor_msgs::image_encodings::BGR8},
+                       {"rgb8", sensor_msgs::image_encodings::RGB8},
+                       {"mono8", sensor_msgs::image_encodings::MONO8},
+                       {"mono16", sensor_msgs::image_encodings::MONO16},
+                       {"32FC1", sensor_msgs::image_encodings::TYPE_32FC1},
+                       {"32FC3", sensor_msgs::image_encodings::TYPE_32FC3},
+                       {"16UC1", sensor_msgs::image_encodings::TYPE_16UC1},
+                       {"8UC1", sensor_msgs::image_encodings::TYPE_8UC1},
+                       {"8UC3", sensor_msgs::image_encodings::TYPE_8UC3},
+                       {"32SC1", sensor_msgs::image_encodings::TYPE_32SC1},
+                       {"32SC3", sensor_msgs::image_encodings::TYPE_32SC3}};
+}
+
+void ArucoDetectorSkillServer::ImageCallback(
+    const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
+  try {
+    cv_bridge::CvImagePtr cv_ptr =
+        cv_bridge::toCvCopy(msg, opencv_encodings_[msg->encoding]);
+
+    // Do all heavy processing BEFORE acquiring the lock
+    cv::Mat converted;
+    const int channels = cv_ptr->image.channels();
+    if (channels == 1)
+      cv::cvtColor(cv_ptr->image, converted, cv::COLOR_GRAY2BGR);
+    else if (channels == 3 || channels == 4)
+      converted = cv_ptr->image;
+    else {
+      RCLCPP_ERROR(node_->get_logger(), "Unsupported number of channels: %d",
+                   channels);
+      return;
+    }
+    converted.convertTo(converted, CV_8U);
+
+    // Critical section — as short as possible
+    {
+      std::lock_guard<std::mutex> lock(image_mutex_);
+      latest_image_ = std::move(converted);
+    }
+    has_image_.store(true);
+
+  } catch (const cv_bridge::Exception &e) {
+    RCLCPP_ERROR(node_->get_logger(), "cv_bridge exception: %s", e.what());
+  }
+}
+
+void ArucoDetectorSkillServer::cameraInfoCallback(
+    const sensor_msgs::msg::CameraInfo::ConstSharedPtr &msg) {
+
+  const bool valid_camera_info = std::any_of(msg->k.begin(), msg->k.end(),
+                                             [](double v) { return v != 0.0; });
+
+  if (!valid_camera_info) {
+    RCLCPP_WARN(node_->get_logger(),
+                "Received invalid camera intrinsics (K all zeros)");
+    return;
+  }
+
+  cv::Mat camera_intrinsics_matrix = cv::Mat::zeros(3, 3, CV_64F);
+  for (int i = 0; i < 3; i++)
+    for (int j = 0; j < 3; j++)
+      camera_intrinsics_matrix.at<double>(i, j) = msg->k[i * 3 + j];
+
+  const int d_size = static_cast<int>(msg->d.size());
+  cv::Mat camera_distortion_coefficients_matrix =
+      cv::Mat::zeros(1, d_size, CV_64F);
+  for (int i = 0; i < d_size; i++)
+    camera_distortion_coefficients_matrix.at<double>(0, i) = msg->d[i];
+
+  // Critical section — both matrices updated atomically
+  {
+    std::lock_guard<std::mutex> lock(camera_info_mutex_);
+    camera_intrinsics_matrix_ = std::move(camera_intrinsics_matrix);
+    camera_distortion_coefficients_matrix_ =
+        std::move(camera_distortion_coefficients_matrix);
+  }
+  has_camera_info_.store(true);
 }
 
 void ArucoDetectorSkillServer::execute(
@@ -252,6 +329,40 @@ bool ArucoDetectorSkillServer::DetectAruco() {
 
   auto dic_type = dictionaryFromString("DICT_4X4_50");
 
-  aruco_detector_skill::utils::ArucoUtils detector(dic_type, detectorParams);
+  // Snapshot method to get the image
+  if (!has_image_.load()) {
+    RCLCPP_WARN(node_->get_logger(), "No image received yet!");
+    return false;
+  }
+
+  if (!has_camera_info_.load()) {
+    RCLCPP_WARN(node_->get_logger(), "No camera info received yet!");
+    return false;
+  }
+
+  cv::Mat local_image;
+  {
+    std::lock_guard<std::mutex> lock(image_mutex_);
+    local_image = latest_image_.clone();
+  }
+
+  cv::Mat local_camera_intrinsics_matrix,
+      local_camera_distortion_coefficients_matrix;
+  {
+    std::lock_guard<std::mutex> lock(camera_info_mutex_);
+    local_camera_intrinsics_matrix = camera_intrinsics_matrix_.clone();
+    local_camera_distortion_coefficients_matrix =
+        camera_distortion_coefficients_matrix_.clone();
+  }
+
+  // Image processing steps?
+
+  aruco_detector_skill::utils::ArucoUtils aruco_detector(dic_type,
+                                                         detectorParams);
+  // aruco_detector.Detect(image_grayscale, );
+
+  // Do something with pose
+
+  has_image_.store(false);
   return true;
 }
