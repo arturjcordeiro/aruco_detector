@@ -38,6 +38,8 @@ aruco_detector_skill_server:
     # ── Dictionary ─────────────────────────────────────────────────────────────
     Dictionary: "DICT_4X4_50"
 
+    #Missing specific aruco id
+
     # ── ArUco Detector Parameters ──────────────────────────────────────────────
     Aruco:
       # Adaptive thresholding

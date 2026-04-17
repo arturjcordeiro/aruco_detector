@@ -530,6 +530,7 @@ bool ArucoDetectorSkillServer::DetectAruco() {
   cv::aruco::PredefinedDictionaryType dic_type =
       DictionaryFromString(dict_id_string_);
 
+  // Instance should be in a previous step
   aruco_detector_skill::utils::ArucoUtils aruco_detector(dic_type,
                                                          detector_parameters_);
   size_t n_markers = 0;

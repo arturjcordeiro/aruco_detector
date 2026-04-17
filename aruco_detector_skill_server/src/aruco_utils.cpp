@@ -10,6 +10,8 @@
 #include <vector>
 
 namespace aruco_detector_skill::utils {
+
+// It should detect one or more arucos?
 void ArucoUtils::Detect(const cv::Mat &image_grayscale,
                         const cv::Mat &camera_intrinsics,
                         const cv::Mat &camera_distortion_coefficients,
