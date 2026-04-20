@@ -9,7 +9,7 @@ project(aruco_detector_skill_server)
 # Set C++17 standard if not already set
 # Important for using modern C++ features
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 20)
 endif()
 
 # Enable compiler warnings to improve code quality

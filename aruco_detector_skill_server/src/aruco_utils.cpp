@@ -1,4 +1,6 @@
 #include "aruco_detector_skill_server/aruco_utils.hpp"
+#include <format>
+#include <iostream>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/core/mat.hpp>
@@ -40,31 +42,32 @@ void ArucoUtils::Detect(const cv::Mat &image_grayscale,
 
   n_markers = corners.size();
 
-  tvecs.reserve(n_markers);
-  rvecs.reserve(n_markers);
+  tvecs.resize(n_markers);
+  rvecs.resize(n_markers);
 
-  for (size_t i = 0; i < n_markers; i++)
+  for (size_t i = 0; i < n_markers; i++) {
     cv::solvePnP(objPoints, corners[i], camera_intrinsics,
                  camera_distortion_coefficients, rvecs[i], tvecs[i],
                  use_extrinsic_guess, pnp_flags);
 
-  if (image_w_results.needed()) {
-    cv::cvtColor(image_grayscale, image_w_results, cv::COLOR_GRAY2BGR);
-    if (!ids.empty()) {
-      cv::aruco::drawDetectedMarkers(image_w_results, corners, ids);
-    }
-
-    if (n_markers && !rvecs.empty() && !tvecs.empty()) {
-      for (unsigned int i = 0; i < ids.size(); i++) {
-        cv::drawFrameAxes(image_w_results, camera_intrinsics,
-                          camera_distortion_coefficients, rvecs[i], tvecs[i],
-                          marker_length * 1.5f, 2);
+    if (image_w_results.needed()) {
+      cv::cvtColor(image_grayscale, image_w_results, cv::COLOR_GRAY2BGR);
+      if (!ids.empty()) {
+        cv::aruco::drawDetectedMarkers(image_w_results, corners, ids);
       }
-    }
 
-    if (show_rejected && !rejected_corners.empty()) {
-      cv::aruco::drawDetectedMarkers(image_w_results, rejected_corners,
-                                     cv::noArray(), cv::Scalar(100, 0, 255));
+      if (n_markers && !rvecs.empty() && !tvecs.empty()) {
+        for (unsigned int i = 0; i < ids.size(); i++) {
+          cv::drawFrameAxes(image_w_results, camera_intrinsics,
+                            camera_distortion_coefficients, rvecs[i], tvecs[i],
+                            marker_length, 3);
+        }
+      }
+
+      if (show_rejected && !rejected_corners.empty()) {
+        cv::aruco::drawDetectedMarkers(image_w_results, rejected_corners,
+                                       cv::noArray(), cv::Scalar(100, 0, 255));
+      }
     }
   }
 }

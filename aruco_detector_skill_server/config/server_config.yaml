@@ -7,8 +7,8 @@ aruco_detector_skill_server:
 
     # ── Camera Topics ──────────────────────────────────────────────────────────
     Camera:
-      imageSubTopic: "image_raw"
-      cameraInfoTopic: "camera_info"
+      imageSubTopic: "/camera_static/image_raw"
+      cameraInfoTopic: "/camera_static/camera_info"
 
     # ── Result Publisher ───────────────────────────────────────────────────────
     Result:
@@ -16,7 +16,7 @@ aruco_detector_skill_server:
       showRejected: false
 
     # ── PnP / TF ───────────────────────────────────────────────────────────────
-    PnPMethod: 0
+    PnPMethod: 7
     UseStaticTfBroadcaster: false
 
     # ── CLAHE ──────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ aruco_detector_skill_server:
       constantOffsetFromMean: 0.0
 
     # ── Dictionary ─────────────────────────────────────────────────────────────
-    Dictionary: "DICT_4X4_50"
+    Dictionary: "DICT_5X5_1000"
 
     #Missing specific aruco id
 

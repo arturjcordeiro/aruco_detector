@@ -523,7 +523,10 @@ bool ArucoDetectorSkillServer::DetectAruco() {
   }
 
   //---- Detect aruco
+  // Temporary
   bool use_extrinsic_guess{false};
+  marker_length_ = 0.011f;
+
   cv::Mat image_w_results;
 
   std::vector<cv::Vec3d> tvecs, rvecs;
