@@ -11,6 +11,7 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect/aruco_dictionary.hpp>
+#include <set>
 #include <string>
 #include <tf2/time.hpp>
 #include <vector>
@@ -191,6 +192,12 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
   node_->get_parameter_or("Result.topic", image_results_publish_topic_,
                           std::string("result"));
   node_->get_parameter_or("Result.showRejected", show_rejected_, false);
+
+  node_->get_parameter_or("Aruco.markerLength", marker_length_, float(0.001f));
+
+  std::vector<int64_t> ids_vector =
+      node_->get_parameter_or("Aruco.markerIds", std::vector<int64_t>());
+  target_ids_ = std::set<int>(ids_vector.begin(), ids_vector.end());
 
   // ── PnP method
   // ─────────────────────────────────────────────────────
@@ -525,7 +532,6 @@ bool ArucoDetectorSkillServer::DetectAruco() {
   //---- Detect aruco
   // Temporary
   bool use_extrinsic_guess{false};
-  marker_length_ = 0.011f;
 
   cv::Mat image_w_results;
 
@@ -540,8 +546,10 @@ bool ArucoDetectorSkillServer::DetectAruco() {
   aruco_detector.Detect(local_image, local_camera_intrinsics_matrix,
                         local_camera_distortion_coefficients_matrix,
                         marker_length_, tvecs, rvecs, use_extrinsic_guess,
-                        pnp_method_, image_w_results, show_rejected_,
-                        n_markers);
+                        pnp_method_, image_w_results, show_rejected_, n_markers,
+                        target_ids_);
+
+  // TODO: Refine pose with previous extrinsic guess
 
   // Publish Image with results and Poses
   PublishRosImage(image_w_results, image_results_publisher_);
@@ -570,6 +578,11 @@ void ArucoDetectorSkillServer::ApplyAdaptiveThreshold(cv::Mat &img) {
 void ArucoDetectorSkillServer::PublishPoses(std::vector<cv::Vec3d> &tvecs,
                                             std::vector<cv::Vec3d> &rvecs,
                                             size_t n_markers) {
+
+  std::cout << std::format(
+                   "Publishing poses of ({}) markers| Rvecs ({}) | Tvecs({})",
+                   n_markers, rvecs.size(), tvecs.size())
+            << std::endl;
 
   // Do something with pose
   std::vector<geometry_msgs::msg::PoseStamped> charuco_poses;
@@ -638,18 +651,18 @@ void ArucoDetectorSkillServer::PublishRosImage(
 }
 
 void ArucoDetectorSkillServer::FillPose(
-    const cv::Vec3d &_camera_rotation, const cv::Vec3d &_camera_translation,
-    geometry_msgs::msg::PoseStamped &_pose_in_out) {
+    const cv::Vec3d &camera_rotation, const cv::Vec3d &camera_translation,
+    geometry_msgs::msg::PoseStamped &pose_in_out) {
   cv::Mat rotation_matrix;
-  cv::Rodrigues(_camera_rotation, rotation_matrix);
+  cv::Rodrigues(camera_rotation, rotation_matrix);
   Eigen::Matrix3d eigen_rotation_matrix;
   cv::cv2eigen(rotation_matrix, eigen_rotation_matrix);
   Eigen::Quaterniond q(eigen_rotation_matrix);
-  _pose_in_out.pose.position.x = _camera_translation(0);
-  _pose_in_out.pose.position.y = _camera_translation(1);
-  _pose_in_out.pose.position.z = _camera_translation(2);
-  _pose_in_out.pose.orientation.x = q.x();
-  _pose_in_out.pose.orientation.y = q.y();
-  _pose_in_out.pose.orientation.z = q.z();
-  _pose_in_out.pose.orientation.w = q.w();
+  pose_in_out.pose.position.x = camera_translation(0);
+  pose_in_out.pose.position.y = camera_translation(1);
+  pose_in_out.pose.position.z = camera_translation(2);
+  pose_in_out.pose.orientation.x = q.x();
+  pose_in_out.pose.orientation.y = q.y();
+  pose_in_out.pose.orientation.z = q.z();
+  pose_in_out.pose.orientation.w = q.w();
 }

@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <thread>
 
@@ -96,6 +97,7 @@ private:
       adaptive_thresh_max_, marker_length_;
   int clahe_sizex_, clahe_sizey_, adaptive_thresh_method_,
       adaptive_thresh_type_, adaptive_thresh_blocksize_, pnp_method_;
+  std::set<int> target_ids_{};
 
   std_msgs::msg::Header latest_header_;
   geometry_msgs::msg::TransformStamped transform_stamped_;
@@ -117,9 +119,9 @@ private:
   void PublishRosImage(const cv::Mat &img, image_transport::Publisher &pub);
   void PublishPoses(std::vector<cv::Vec3d> &tvecs,
                     std::vector<cv::Vec3d> &rvecs, size_t n_markers);
-  void FillPose(const cv::Vec3d &_camera_rotation,
-                const cv::Vec3d &_camera_translation,
-                geometry_msgs::msg::PoseStamped &_pose_in_out);
+  void FillPose(const cv::Vec3d &camera_rotation,
+                const cv::Vec3d &camera_translation,
+                geometry_msgs::msg::PoseStamped &pose_in_out);
 
   void ImageCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
   void

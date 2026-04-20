@@ -9,6 +9,7 @@
 #include <opencv2/objdetect/aruco_board.hpp>
 #include <opencv2/objdetect/aruco_detector.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <set>
 #include <vector>
 
 namespace aruco_detector_skill::utils {
@@ -21,7 +22,14 @@ void ArucoUtils::Detect(const cv::Mat &image_grayscale,
                         std::vector<cv::Vec3d> &tvecs,
                         std::vector<cv::Vec3d> &rvecs, bool use_extrinsic_guess,
                         int pnp_flags, cv::InputOutputArray image_w_results,
-                        bool show_rejected, size_t n_markers) {
+                        bool show_rejected, size_t &n_markers,
+                        std::set<int> target_ids) {
+
+  if (target_ids.empty()) {
+    std::cout << std::format("Aruco ids empty: ({})", target_ids.size())
+              << std::endl;
+    return;
+  }
 
   std::vector<std::vector<cv::Point2f>> corners;
   std::vector<std::vector<cv::Point2f>> rejected_corners;
@@ -40,35 +48,49 @@ void ArucoUtils::Detect(const cv::Mat &image_grayscale,
   objPoints.ptr<cv::Vec3f>(0)[3] =
       cv::Vec3f(-marker_length / 2.f, -marker_length / 2.f, 0);
 
-  n_markers = corners.size();
+  size_t total_markers = corners.size();
 
-  tvecs.resize(n_markers);
-  rvecs.resize(n_markers);
+  tvecs.reserve(total_markers);
+  rvecs.reserve(total_markers);
+  n_markers = 0;
 
-  for (size_t i = 0; i < n_markers; i++) {
+  if (image_w_results.needed()) {
+    cv::cvtColor(image_grayscale, image_w_results, cv::COLOR_GRAY2BGR);
+    if (!ids.empty()) {
+      cv::aruco::drawDetectedMarkers(image_w_results, corners, ids);
+    }
+
+    if (show_rejected && !rejected_corners.empty()) {
+      cv::aruco::drawDetectedMarkers(image_w_results, rejected_corners,
+                                     cv::noArray(), cv::Scalar(100, 0, 255));
+    }
+  }
+
+  for (size_t i = 0; i < total_markers; i++) {
+
+    if (target_ids.count(ids[i]) == 0) {
+      continue;
+    }
+    std::cout << std::format("Found aruco id: ({})", ids[i]) << std::endl;
+    n_markers++;
+
+    cv::Mat rvec, tvec;
     cv::solvePnP(objPoints, corners[i], camera_intrinsics,
-                 camera_distortion_coefficients, rvecs[i], tvecs[i],
+                 camera_distortion_coefficients, rvec, tvec,
                  use_extrinsic_guess, pnp_flags);
 
-    if (image_w_results.needed()) {
-      cv::cvtColor(image_grayscale, image_w_results, cv::COLOR_GRAY2BGR);
-      if (!ids.empty()) {
-        cv::aruco::drawDetectedMarkers(image_w_results, corners, ids);
-      }
-
-      if (n_markers && !rvecs.empty() && !tvecs.empty()) {
-        for (unsigned int i = 0; i < ids.size(); i++) {
-          cv::drawFrameAxes(image_w_results, camera_intrinsics,
-                            camera_distortion_coefficients, rvecs[i], tvecs[i],
-                            marker_length, 3);
-        }
-      }
-
-      if (show_rejected && !rejected_corners.empty()) {
-        cv::aruco::drawDetectedMarkers(image_w_results, rejected_corners,
-                                       cv::noArray(), cv::Scalar(100, 0, 255));
-      }
+    if (use_extrinsic_guess) {
+      // rvecout[ids[i]] = {rvec.clone(), tvec.clone()};
     }
+
+    if (image_w_results.needed()) {
+      cv::drawFrameAxes(image_w_results, camera_intrinsics,
+                        camera_distortion_coefficients, rvec, tvec,
+                        marker_length, 3);
+    }
+
+    tvecs.push_back(tvec);
+    rvecs.push_back(rvec);
   }
 }
 

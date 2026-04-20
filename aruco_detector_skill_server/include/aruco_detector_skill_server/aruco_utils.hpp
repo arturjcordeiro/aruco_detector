@@ -4,6 +4,7 @@
 #include <opencv2/objdetect/aruco_detector.hpp>
 #include <opencv2/objdetect/aruco_dictionary.hpp>
 #include <opencv2/opencv.hpp>
+#include <set>
 #include <vector>
 
 #ifndef ARUCO_DETECTOR_SKILL_SERVER_ARUCO_UTILS_H
@@ -32,7 +33,7 @@ public:
               const float markerLength, std::vector<cv::Vec3d> &tvecs,
               std::vector<cv::Vec3d> &rvecs, bool use_extrinsic_guess,
               int pnp_flags, cv::InputOutputArray image_w_results,
-              bool show_rejected, size_t n_markers);
+              bool show_rejected, size_t &n_markers, std::set<int> target_ids);
 };
 } // namespace aruco_detector_skill::utils
 #endif // ARUCO_DETECTOR_SKILL_SERVER_ARUCO_UTILS_H
