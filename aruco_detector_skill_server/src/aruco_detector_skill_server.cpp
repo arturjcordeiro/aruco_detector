@@ -8,6 +8,7 @@
  */
 
 #include "aruco_detector_skill_server/aruco_detector_skill_server.hpp"
+#include <memory>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect/aruco_dictionary.hpp>
@@ -361,6 +362,12 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
   static_tf_broadcaster_ =
       std::make_shared<tf2_ros::StaticTransformBroadcaster>(node_);
   tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(node_);
+
+  // Detector init
+  cv::aruco::PredefinedDictionaryType dic_type =
+      DictionaryFromString(dict_id_string_);
+  aruco_detector_ = std::make_unique<aruco_detector_skill::utils::ArucoUtils>(
+      dic_type, detector_parameters_);
 }
 
 void ArucoDetectorSkillServer::ImageCallback(
@@ -536,18 +543,13 @@ bool ArucoDetectorSkillServer::DetectAruco() {
   cv::Mat image_w_results;
 
   std::vector<cv::Vec3d> tvecs, rvecs;
-  cv::aruco::PredefinedDictionaryType dic_type =
-      DictionaryFromString(dict_id_string_);
 
-  // Instance should be in a previous step
-  aruco_detector_skill::utils::ArucoUtils aruco_detector(dic_type,
-                                                         detector_parameters_);
   size_t n_markers = 0;
-  aruco_detector.Detect(local_image, local_camera_intrinsics_matrix,
-                        local_camera_distortion_coefficients_matrix,
-                        marker_length_, tvecs, rvecs, use_extrinsic_guess,
-                        pnp_method_, image_w_results, show_rejected_, n_markers,
-                        target_ids_);
+  aruco_detector_->Detect(local_image, local_camera_intrinsics_matrix,
+                          local_camera_distortion_coefficients_matrix,
+                          marker_length_, tvecs, rvecs, use_extrinsic_guess,
+                          pnp_method_, image_w_results, show_rejected_,
+                          n_markers, target_ids_);
 
   // TODO: Refine pose with previous extrinsic guess
 

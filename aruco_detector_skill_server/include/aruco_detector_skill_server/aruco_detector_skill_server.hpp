@@ -109,6 +109,8 @@ private:
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
       camera_info_subscriber_;
 
+  std::unique_ptr<aruco_detector_skill::utils::ArucoUtils> aruco_detector_;
+
   rclcpp_action::Server<ArucoDetectorSkill>::SharedPtr action_server_;
 
   bool DetectAruco();

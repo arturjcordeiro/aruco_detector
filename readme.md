@@ -1,6 +1,6 @@
 # ROS 2 ArUco Detector Skill
 
-![ArUco Detection Example](https://docs.opencv.org/4.12.0/singlemarkersdetection.jpg)
+![ArUco Detection Example](docs/img1.png)
 
 A highly configurable ROS 2 node for detecting ArUco markers and estimating their 6D poses in the camera frame using **OpenCV 4.12**. 
 
