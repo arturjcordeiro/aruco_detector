@@ -4,6 +4,8 @@ aruco_detector_skill_server:
     RosVerbosityLevel: "DEBUG"
     LogFolderPath: ""
     DebugTools: true
+    RefreshRate: 10
+    Timeout: 20
 
     # ── Camera Topics ──────────────────────────────────────────────────────────
     Camera:

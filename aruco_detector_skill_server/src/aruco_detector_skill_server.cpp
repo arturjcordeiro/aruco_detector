@@ -8,14 +8,8 @@
  */
 
 #include "aruco_detector_skill_server/aruco_detector_skill_server.hpp"
-#include <memory>
-#include <opencv2/calib3d.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/objdetect/aruco_dictionary.hpp>
-#include <set>
-#include <string>
-#include <tf2/time.hpp>
-#include <vector>
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_array.hpp"
 
 ArucoDetectorSkillServer::ArucoDetectorSkillServer(
     const rclcpp::Node::SharedPtr &_node) {
@@ -181,6 +175,10 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
   node_->get_parameter_or("LogFolderPath", logs_path_, std::string(""));
   node_->get_parameter_or("DebugTools", debug_tool_, true);
 
+  // Node rate and limits
+  node_->get_parameter_or("RefreshRate", refresh_rate_, 10);
+  node_->get_parameter_or("Timeout", timeout_seconds_, 10);
+
   // ── camera topics
   // ─────────────────────────────────────────────────────
   node_->get_parameter_or("Camera.imageSubTopic", image_sub_topic_,
@@ -340,6 +338,7 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
 
   RCLCPP_INFO(node_->get_logger(), "Finishing setting up.");
 
+  // Camera subscriber - Image and Camera info
   image_transport_ptr_ =
       std::make_shared<image_transport::ImageTransport>(node_);
   image_subscriber_ = image_transport_ptr_->subscribe(
@@ -351,11 +350,16 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
           std::bind(&ArucoDetectorSkillServer::cameraInfoCallback, this,
                     std::placeholders::_1));
 
+  // Results publisher
   image_transport_results_ptr_ =
       std::make_shared<image_transport::ImageTransport>(node_);
   image_results_publisher_ = image_transport_results_ptr_->advertise(
       image_results_publish_topic_, 1, true);
 
+  pose_publisher_ = node_->create_publisher<geometry_msgs::msg::PoseArray>(
+      "charuco_poses", 10);
+
+  // Tf publisher
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(node_->get_clock(),
                                                  tf2::durationFromSec(30.0));
   tf_listener_ptr_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -412,8 +416,8 @@ void ArucoDetectorSkillServer::cameraInfoCallback(
                                              [](double v) { return v != 0.0; });
 
   if (!valid_camera_info) {
-    RCLCPP_WARN(node_->get_logger(),
-                "Received invalid camera intrinsics (K all zeros)");
+    RCLCPP_ERROR(node_->get_logger(),
+                 "Received invalid camera intrinsics (K all zeros)");
     return;
   }
 
@@ -428,7 +432,6 @@ void ArucoDetectorSkillServer::cameraInfoCallback(
   for (int i = 0; i < d_size; i++)
     camera_distortion_coefficients_matrix.at<double>(0, i) = msg->d[i];
 
-  // Critical section — both matrices updated atomically
   {
     std::lock_guard<std::mutex> lock(camera_info_mutex_);
     camera_intrinsics_matrix_ = std::move(camera_intrinsics_matrix);
@@ -440,15 +443,6 @@ void ArucoDetectorSkillServer::cameraInfoCallback(
 
 void ArucoDetectorSkillServer::execute(
     const std::shared_ptr<GoalHandleArucoDetectorSkill> _goal_handle) {
-  /*
-  The execution of the skill should be coded here.
-  In order to save you time, the methods check_preemption(), feedback(),
-  set_succeeded() and set_aborted() should be used. The check_preemption()
-  method should be called periodically. The variable "percentage" should be
-  updated when there is an evolution in the execution of the skill. feedback()
-  method should be called when there is an evolution in the execution of the
-  skill.
-  */
 
   RCLCPP_INFO(node_->get_logger(), "Executing skill.");
   const auto goal = _goal_handle->get_goal();
@@ -463,12 +457,18 @@ void ArucoDetectorSkillServer::execute(
       action_success = true;
     }
     break;
+  case OperationMode::Continuous:
+    if (ContinuousArucoDetection()) {
+      action_success = true;
+    }
+    break;
   }
 
   (action_success) ? set_succeeded(_goal_handle, "succeeded", action_outcome_)
                    : set_aborted(_goal_handle, "aborted", "aborted");
 }
 
+// Convert string to Opencv dictionary
 cv::aruco::PredefinedDictionaryType
 ArucoDetectorSkillServer::DictionaryFromString(const std::string &name) {
   static const std::unordered_map<std::string,
@@ -496,9 +496,86 @@ ArucoDetectorSkillServer::DictionaryFromString(const std::string &name) {
   return it->second;
 }
 
-bool ArucoDetectorSkillServer::DetectAruco() {
-  // Only for tests
+bool ArucoDetectorSkillServer::ContinuousArucoDetection() {
+  auto start_time = std::chrono::steady_clock::now();
+  rclcpp::Rate rate(refresh_rate_); // 10hz
 
+  // Snapshot method to get the image
+  while (rclcpp::ok()) {
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::seconds>(now - start_time)
+            .count();
+
+    if (elapsed >= timeout_seconds_) {
+      RCLCPP_INFO(node_->get_logger(), "Timeout reached, exiting loop");
+      break;
+    }
+
+    if (!has_image_.load()) {
+      RCLCPP_WARN(node_->get_logger(), "No image received yet!");
+      rate.sleep();
+      continue;
+    }
+
+    if (!has_camera_info_.load()) {
+      RCLCPP_WARN(node_->get_logger(), "No camera info received yet!");
+      rate.sleep();
+      continue;
+    }
+
+    cv::Mat local_image;
+    {
+      std::lock_guard<std::mutex> lock(image_mutex_);
+      local_image = latest_image_.clone();
+    }
+
+    cv::Mat local_camera_intrinsics_matrix,
+        local_camera_distortion_coefficients_matrix;
+    {
+      std::lock_guard<std::mutex> lock(camera_info_mutex_);
+      local_camera_intrinsics_matrix = camera_intrinsics_matrix_.clone();
+      local_camera_distortion_coefficients_matrix =
+          camera_distortion_coefficients_matrix_.clone();
+    }
+
+    if (use_clahe_) {
+      ApplyClahe(local_image);
+    }
+
+    if (use_adaptivethreshold_) {
+      ApplyAdaptiveThreshold(local_image);
+    }
+
+    //---- Detect aruco
+    // Temporary
+    bool use_extrinsic_guess{false};
+
+    cv::Mat image_w_results;
+    std::vector<cv::Vec3d> tvecs, rvecs;
+    size_t n_markers = 0;
+
+    aruco_detector_->Detect(local_image, local_camera_intrinsics_matrix,
+                            local_camera_distortion_coefficients_matrix,
+                            marker_length_, tvecs, rvecs, use_extrinsic_guess,
+                            pnp_method_, image_w_results, show_rejected_,
+                            n_markers, target_ids_);
+
+    // TODO: Refine pose with previous extrinsic guess
+
+    // Publish Image with results and Poses
+    PublishRosImage(image_w_results, image_results_publisher_);
+
+    PublishPoses(tvecs, rvecs, n_markers);
+
+    has_image_.store(false);
+
+    rate.sleep();
+  }
+  return true;
+}
+
+bool ArucoDetectorSkillServer::DetectAruco() {
   // Snapshot method to get the image
   if (!has_image_.load()) {
     RCLCPP_WARN(node_->get_logger(), "No image received yet!");
@@ -525,9 +602,6 @@ bool ArucoDetectorSkillServer::DetectAruco() {
         camera_distortion_coefficients_matrix_.clone();
   }
 
-  // Image processing steps?
-  // Converting to grayscale and 8 bit in callback. I dont know if it should be
-  // moved to detection call
   if (use_clahe_) {
     ApplyClahe(local_image);
   }
@@ -541,10 +615,9 @@ bool ArucoDetectorSkillServer::DetectAruco() {
   bool use_extrinsic_guess{false};
 
   cv::Mat image_w_results;
-
   std::vector<cv::Vec3d> tvecs, rvecs;
-
   size_t n_markers = 0;
+
   aruco_detector_->Detect(local_image, local_camera_intrinsics_matrix,
                           local_camera_distortion_coefficients_matrix,
                           marker_length_, tvecs, rvecs, use_extrinsic_guess,
@@ -555,6 +628,7 @@ bool ArucoDetectorSkillServer::DetectAruco() {
 
   // Publish Image with results and Poses
   PublishRosImage(image_w_results, image_results_publisher_);
+
   PublishPoses(tvecs, rvecs, n_markers);
 
   has_image_.store(false);
@@ -580,36 +654,36 @@ void ArucoDetectorSkillServer::ApplyAdaptiveThreshold(cv::Mat &img) {
 void ArucoDetectorSkillServer::PublishPoses(std::vector<cv::Vec3d> &tvecs,
                                             std::vector<cv::Vec3d> &rvecs,
                                             size_t n_markers) {
-
+  geometry_msgs::msg::PoseArray charuco_poses_out;
   std::cout << std::format(
                    "Publishing poses of ({}) markers| Rvecs ({}) | Tvecs({})",
                    n_markers, rvecs.size(), tvecs.size())
             << std::endl;
 
   // Do something with pose
-  std::vector<geometry_msgs::msg::PoseStamped> charuco_poses;
-  charuco_poses.reserve(n_markers);
+  std::vector<geometry_msgs::msg::Pose> charuco_poses;
+  charuco_poses.resize(n_markers);
   std::vector<geometry_msgs::msg::TransformStamped> transforms;
-  transforms.reserve(charuco_poses.size());
+  transforms.resize(charuco_poses.size());
 
   for (size_t i = 0; i < n_markers; i++) {
     FillPose(rvecs[i], tvecs[i], charuco_poses[i]);
 
     geometry_msgs::msg::TransformStamped transform_stamped;
     transform_stamped.header = latest_header_;
-    transform_stamped.header.frame_id = latest_header_.frame_id;
     transform_stamped.child_frame_id = "charuco_" + std::to_string(i);
 
-    transform_stamped.transform.translation.x =
-        charuco_poses[i].pose.position.x;
-    transform_stamped.transform.translation.y =
-        charuco_poses[i].pose.position.y;
-    transform_stamped.transform.translation.z =
-        charuco_poses[i].pose.position.z;
-    transform_stamped.transform.rotation = charuco_poses[i].pose.orientation;
+    transform_stamped.transform.translation.x = charuco_poses[i].position.x;
+    transform_stamped.transform.translation.y = charuco_poses[i].position.y;
+    transform_stamped.transform.translation.z = charuco_poses[i].position.z;
+    transform_stamped.transform.rotation = charuco_poses[i].orientation;
 
     transforms.push_back(std::move(transform_stamped));
   }
+
+  charuco_poses_out.header = latest_header_;
+  charuco_poses_out.poses = std::move(charuco_poses);
+  pose_publisher_->publish(charuco_poses_out);
 
   // Send all transforms in a single call — more efficient than one by one
   if (use_static_tf_broadcaster_)
@@ -652,19 +726,19 @@ void ArucoDetectorSkillServer::PublishRosImage(
   pub.publish(*msg);
 }
 
-void ArucoDetectorSkillServer::FillPose(
-    const cv::Vec3d &camera_rotation, const cv::Vec3d &camera_translation,
-    geometry_msgs::msg::PoseStamped &pose_in_out) {
+void ArucoDetectorSkillServer::FillPose(const cv::Vec3d &camera_rotation,
+                                        const cv::Vec3d &camera_translation,
+                                        geometry_msgs::msg::Pose &pose_in_out) {
   cv::Mat rotation_matrix;
   cv::Rodrigues(camera_rotation, rotation_matrix);
   Eigen::Matrix3d eigen_rotation_matrix;
   cv::cv2eigen(rotation_matrix, eigen_rotation_matrix);
   Eigen::Quaterniond q(eigen_rotation_matrix);
-  pose_in_out.pose.position.x = camera_translation(0);
-  pose_in_out.pose.position.y = camera_translation(1);
-  pose_in_out.pose.position.z = camera_translation(2);
-  pose_in_out.pose.orientation.x = q.x();
-  pose_in_out.pose.orientation.y = q.y();
-  pose_in_out.pose.orientation.z = q.z();
-  pose_in_out.pose.orientation.w = q.w();
+  pose_in_out.position.x = camera_translation(0);
+  pose_in_out.position.y = camera_translation(1);
+  pose_in_out.position.z = camera_translation(2);
+  pose_in_out.orientation.x = q.x();
+  pose_in_out.orientation.y = q.y();
+  pose_in_out.orientation.z = q.z();
+  pose_in_out.orientation.w = q.w();
 }

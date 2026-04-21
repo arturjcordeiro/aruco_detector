@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <rclcpp/publisher.hpp>
 #include <set>
 #include <string>
 #include <thread>
@@ -34,7 +35,17 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
+#include "geometry_msgs/msg/pose_array.hpp"
+#include <memory>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/core/eigen.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/objdetect/aruco_dictionary.hpp>
+#include <rclcpp/rate.hpp>
+#include <set>
+#include <string>
+#include <tf2/time.hpp>
+#include <vector>
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -69,6 +80,7 @@ public:
 private:
   enum OperationMode {
     Detect = 0,
+    Continuous = 1,
   };
 
   std::mutex image_mutex_, camera_info_mutex_;
@@ -96,7 +108,8 @@ private:
   float clahe_clip_limit_, adaptive_thresh_offset_from_mean_,
       adaptive_thresh_max_, marker_length_;
   int clahe_sizex_, clahe_sizey_, adaptive_thresh_method_,
-      adaptive_thresh_type_, adaptive_thresh_blocksize_, pnp_method_;
+      adaptive_thresh_type_, adaptive_thresh_blocksize_, pnp_method_,
+      timeout_seconds_, refresh_rate_;
   std::set<int> target_ids_{};
 
   std_msgs::msg::Header latest_header_;
@@ -106,6 +119,7 @@ private:
   std::shared_ptr<image_transport::ImageTransport> image_transport_results_ptr_;
   image_transport::Subscriber image_subscriber_;
   image_transport::Publisher image_results_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr pose_publisher_;
   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr
       camera_info_subscriber_;
 
@@ -114,6 +128,7 @@ private:
   rclcpp_action::Server<ArucoDetectorSkill>::SharedPtr action_server_;
 
   bool DetectAruco();
+  bool ContinuousArucoDetection();
   static cv::aruco::PredefinedDictionaryType
   DictionaryFromString(const std::string &name);
   void ApplyClahe(cv::Mat &img_in);
@@ -123,7 +138,7 @@ private:
                     std::vector<cv::Vec3d> &rvecs, size_t n_markers);
   void FillPose(const cv::Vec3d &camera_rotation,
                 const cv::Vec3d &camera_translation,
-                geometry_msgs::msg::PoseStamped &pose_in_out);
+                geometry_msgs::msg::Pose &pose_in_out);
 
   void ImageCallback(const sensor_msgs::msg::Image::ConstSharedPtr &msg);
   void

@@ -5,7 +5,6 @@ int32 operation
 int32 percentage
 string skill_status
 string outcome
-
 ---
 #feedback
 int32 percentage
