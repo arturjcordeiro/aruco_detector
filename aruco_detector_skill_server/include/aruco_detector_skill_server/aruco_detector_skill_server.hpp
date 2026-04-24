@@ -81,6 +81,7 @@ private:
   enum OperationMode {
     Detect = 0,
     Continuous = 1,
+    Image = 2,
   };
 
   std::mutex image_mutex_, camera_info_mutex_;
@@ -95,7 +96,8 @@ private:
   rclcpp::Node::SharedPtr node_;
   std::string package_path_, ros_verbosity_level_, logs_path_,
       node_timestamp_id_, action_outcome_, image_sub_topic_, camera_info_topic_,
-      image_results_publish_topic_, dict_id_string_;
+      image_results_publish_topic_, dict_id_string_, image_path_,
+      intrinsic_path_;
   std::unordered_map<std::string, std::string> opencv_encodings_;
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
@@ -104,7 +106,7 @@ private:
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   bool use_clahe_, use_adaptivethreshold_, show_rejected_,
-      use_static_tf_broadcaster_, debug_tool_;
+      use_static_tf_broadcaster_, debug_tool_, use_marker_ids_;
   float clahe_clip_limit_, adaptive_thresh_offset_from_mean_,
       adaptive_thresh_max_, marker_length_;
   int clahe_sizex_, clahe_sizey_, adaptive_thresh_method_,
@@ -129,6 +131,7 @@ private:
 
   bool DetectAruco();
   bool ContinuousArucoDetection();
+  bool OfflineImage();
   static cv::aruco::PredefinedDictionaryType
   DictionaryFromString(const std::string &name);
   void ApplyClahe(cv::Mat &img_in);

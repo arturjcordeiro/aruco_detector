@@ -10,6 +10,7 @@
 #include "aruco_detector_skill_server/aruco_detector_skill_server.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_array.hpp"
+#include <opencv2/imgcodecs.hpp>
 
 ArucoDetectorSkillServer::ArucoDetectorSkillServer(
     const rclcpp::Node::SharedPtr &_node) {
@@ -179,6 +180,10 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
   node_->get_parameter_or("RefreshRate", refresh_rate_, 10);
   node_->get_parameter_or("Timeout", timeout_seconds_, 10);
 
+  // -- Topics to use when running "Image" action == 2
+  node_->get_parameter_or("ImagePath", image_path_, std::string(""));
+  node_->get_parameter_or("CameraYaml", intrinsic_path_, std::string(""));
+
   // ── camera topics
   // ─────────────────────────────────────────────────────
   node_->get_parameter_or("Camera.imageSubTopic", image_sub_topic_,
@@ -194,9 +199,12 @@ void ArucoDetectorSkillServer::SetupSkillConfigurationFromParameterServer() {
 
   node_->get_parameter_or("Aruco.markerLength", marker_length_, float(0.001f));
 
-  std::vector<int64_t> ids_vector =
-      node_->get_parameter_or("Aruco.markerIds", std::vector<int64_t>());
-  target_ids_ = std::set<int>(ids_vector.begin(), ids_vector.end());
+  node_->get_parameter_or("Aruco.useMarkerIds", use_marker_ids_, false);
+  if (use_marker_ids_) {
+    std::vector<int64_t> ids_vector =
+        node_->get_parameter_or("Aruco.markerIds", std::vector<int64_t>());
+    target_ids_ = std::set<int>(ids_vector.begin(), ids_vector.end());
+  }
 
   // ── PnP method
   // ─────────────────────────────────────────────────────
@@ -462,6 +470,11 @@ void ArucoDetectorSkillServer::execute(
       action_success = true;
     }
     break;
+  case OperationMode::Image:
+    if (OfflineImage()) {
+      action_success = true;
+    }
+    break;
   }
 
   (action_success) ? set_succeeded(_goal_handle, "succeeded", action_outcome_)
@@ -572,6 +585,55 @@ bool ArucoDetectorSkillServer::ContinuousArucoDetection() {
 
     rate.sleep();
   }
+  return true;
+}
+
+bool ArucoDetectorSkillServer::OfflineImage() {
+
+  cv::Mat local_camera_intrinsics_matrix,
+      local_camera_distortion_coefficients_matrix;
+
+  cv::Mat local_image = cv::imread(image_path_, cv::IMREAD_GRAYSCALE);
+
+  cv::FileStorage fs(intrinsic_path_, cv::FileStorage::READ);
+
+  if (fs.isOpened()) {
+    fs["camera_matrix"] >> local_camera_intrinsics_matrix;
+    fs["distortion_coefficients"] >>
+        local_camera_distortion_coefficients_matrix;
+    fs.release();
+
+    std::cout << "Successfully loaded via OpenCV." << std::endl;
+  } else {
+    std::cerr << "Error: Could not open the file." << std::endl;
+  }
+
+  if (use_clahe_) {
+    ApplyClahe(local_image);
+  }
+
+  if (use_adaptivethreshold_) {
+    ApplyAdaptiveThreshold(local_image);
+  }
+
+  //---- Detect aruco
+  // Temporary
+  bool use_extrinsic_guess{false};
+
+  cv::Mat image_w_results;
+  std::vector<cv::Vec3d> tvecs, rvecs;
+  size_t n_markers = 0;
+
+  aruco_detector_->Detect(local_image, local_camera_intrinsics_matrix,
+                          local_camera_distortion_coefficients_matrix,
+                          marker_length_, tvecs, rvecs, use_extrinsic_guess,
+                          pnp_method_, image_w_results, show_rejected_,
+                          n_markers, target_ids_);
+
+  // Publish Image with results and Poses
+  PublishRosImage(image_w_results, image_results_publisher_);
+
+  has_image_.store(false);
   return true;
 }
 

@@ -7,6 +7,10 @@ aruco_detector_skill_server:
     RefreshRate: 10
     Timeout: 20
 
+    # -- Topics to use when running "Image" action == 2
+    ImagePath: ""
+    CameraYaml: ""
+
     # ── Camera Topics ──────────────────────────────────────────────────────────
     Camera:
       imageSubTopic: "/camera_static/image_raw"
@@ -23,7 +27,7 @@ aruco_detector_skill_server:
 
     # ── CLAHE ──────────────────────────────────────────────────────────────────
     Clahe:
-      use: true
+      use: false
       clipLimit: 4.0
       sizeX: 2
       sizeY: 2
@@ -44,7 +48,8 @@ aruco_detector_skill_server:
 
     # ── ArUco Detector Parameters ──────────────────────────────────────────────
     Aruco:
-      markerLength: 0.011
+      markerLength: 0.100
+      useMarkerIds: false
       markerIds: [75, 40, 39]
       # Adaptive thresholding
       adaptiveThreshWinSizeMin: 3

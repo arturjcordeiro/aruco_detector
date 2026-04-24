@@ -25,17 +25,18 @@ void ArucoUtils::Detect(const cv::Mat &image_grayscale,
                         bool show_rejected, size_t &n_markers,
                         std::set<int> target_ids) {
 
-  if (target_ids.empty()) {
-    std::cout << std::format("Aruco ids empty: ({})", target_ids.size())
-              << std::endl;
-    return;
-  }
-
   std::vector<std::vector<cv::Point2f>> corners;
   std::vector<std::vector<cv::Point2f>> rejected_corners;
   std::vector<int> ids;
 
   detector_.detectMarkers(image_grayscale, corners, ids, rejected_corners);
+
+  if (ids.empty()) {
+    std::cout << std::format("Did not detect aruco's: ({})", ids.size())
+              << std::endl;
+    cv::cvtColor(image_grayscale, image_w_results, cv::COLOR_GRAY2BGR);
+    return;
+  }
 
   // Estimate aruco's pose
   cv::Mat objPoints(4, 1, CV_32FC3);
@@ -66,31 +67,56 @@ void ArucoUtils::Detect(const cv::Mat &image_grayscale,
     }
   }
 
-  for (size_t i = 0; i < total_markers; i++) {
+  if (target_ids.empty()) {
+    for (size_t i = 0; i < total_markers; i++) {
 
-    if (target_ids.count(ids[i]) == 0) {
-      continue;
+      n_markers++;
+
+      cv::Mat rvec, tvec;
+      cv::solvePnP(objPoints, corners[i], camera_intrinsics,
+                   camera_distortion_coefficients, rvec, tvec,
+                   use_extrinsic_guess, pnp_flags);
+
+      if (use_extrinsic_guess) {
+        // rvecout[ids[i]] = {rvec.clone(), tvec.clone()};
+      }
+
+      if (image_w_results.needed()) {
+        cv::drawFrameAxes(image_w_results, camera_intrinsics,
+                          camera_distortion_coefficients, rvec, tvec,
+                          marker_length, 3);
+      }
+
+      tvecs.push_back(tvec);
+      rvecs.push_back(rvec);
     }
-    std::cout << std::format("Found aruco id: ({})", ids[i]) << std::endl;
-    n_markers++;
+  } else {
+    for (size_t i = 0; i < total_markers; i++) {
 
-    cv::Mat rvec, tvec;
-    cv::solvePnP(objPoints, corners[i], camera_intrinsics,
-                 camera_distortion_coefficients, rvec, tvec,
-                 use_extrinsic_guess, pnp_flags);
+      if (target_ids.count(ids[i]) == 0) {
+        continue;
+      }
+      std::cout << std::format("Found aruco id: ({})", ids[i]) << std::endl;
+      n_markers++;
 
-    if (use_extrinsic_guess) {
-      // rvecout[ids[i]] = {rvec.clone(), tvec.clone()};
+      cv::Mat rvec, tvec;
+      cv::solvePnP(objPoints, corners[i], camera_intrinsics,
+                   camera_distortion_coefficients, rvec, tvec,
+                   use_extrinsic_guess, pnp_flags);
+
+      if (use_extrinsic_guess) {
+        // rvecout[ids[i]] = {rvec.clone(), tvec.clone()};
+      }
+
+      if (image_w_results.needed()) {
+        cv::drawFrameAxes(image_w_results, camera_intrinsics,
+                          camera_distortion_coefficients, rvec, tvec,
+                          marker_length, 3);
+      }
+
+      tvecs.push_back(tvec);
+      rvecs.push_back(rvec);
     }
-
-    if (image_w_results.needed()) {
-      cv::drawFrameAxes(image_w_results, camera_intrinsics,
-                        camera_distortion_coefficients, rvec, tvec,
-                        marker_length, 3);
-    }
-
-    tvecs.push_back(tvec);
-    rvecs.push_back(rvec);
   }
 }
 
