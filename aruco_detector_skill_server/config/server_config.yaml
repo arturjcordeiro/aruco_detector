@@ -8,8 +8,8 @@ aruco_detector_skill_server:
     Timeout: 20
 
     # -- Topics to use when running "Image" action == 2
-    ImagePath: ""
-    CameraYaml: ""
+    ImagePath: "/home/godspeed/Documents/Review_data/aruco2_color.png"
+    CameraYaml: "/home/godspeed/ros_workspaces/dev_ws/src/aruco_detector_skill/aruco_detector_skill_server/config/calibration.yaml"
 
     # ── Camera Topics ──────────────────────────────────────────────────────────
     Camera:
@@ -42,7 +42,7 @@ aruco_detector_skill_server:
       constantOffsetFromMean: 0.0
 
     # ── Dictionary ─────────────────────────────────────────────────────────────
-    Dictionary: "DICT_5X5_1000"
+    Dictionary: "DICT_4X4_1000"
 
     #Missing specific aruco id
 

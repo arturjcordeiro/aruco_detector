@@ -633,6 +633,8 @@ bool ArucoDetectorSkillServer::OfflineImage() {
   // Publish Image with results and Poses
   PublishRosImage(image_w_results, image_results_publisher_);
 
+  PublishPoses(tvecs, rvecs, n_markers);
+
   has_image_.store(false);
   return true;
 }
